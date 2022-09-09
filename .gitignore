@@ -1,0 +1,11 @@
+checkpoints/
+*.pt
+*.zip
+*.onnx
+*.wav
+__MACOSX/
+__pycache__/
+.vscode/
+mel_spectrograms/
+*.log
+*.txt
