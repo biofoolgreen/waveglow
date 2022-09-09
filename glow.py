@@ -76,7 +76,8 @@ class Invertible1x1Conv(torch.nn.Module):
         # Ensure determinant is 1.0 not -1.0
         if torch.det(W) < 0:
             W[:,0] = -1*W[:,0]
-        W = W.view(c, c, 1)
+        # W = W.view(c, c, 1)
+        W = W.contiguous().view(c, c, 1)
         self.conv.weight.data = W
 
     def forward(self, z, reverse=False):
@@ -210,7 +211,6 @@ class WaveGlow(torch.nn.Module):
         forward_input[1] = audio: batch x time
         """
         spect, audio = forward_input
-
         #  Upsample spectrogram to size of audio
         spect = self.upsample(spect)
         assert(spect.size(2) >= audio.size(1))

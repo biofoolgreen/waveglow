@@ -33,9 +33,7 @@ from mel2samp import files_to_list, MAX_WAV_VALUE
 from denoiser import Denoiser
 
 
-def main(mel_files, waveglow_path, sigma, output_dir, sampling_rate, is_fp16,
-         denoiser_strength):
-    mel_files = files_to_list(mel_files)
+def main(num_runs, waveglow_path, is_fp16, sampling_rate, denoiser_strength, dynamic_mel_length=False):
     waveglow = torch.load(waveglow_path)['model']
     waveglow = waveglow.remove_weightnorm(waveglow)
     waveglow.cuda().eval()
@@ -49,15 +47,14 @@ def main(mel_files, waveglow_path, sigma, output_dir, sampling_rate, is_fp16,
     audio_arr = []
     rtf_arr = []
     mellen = 0
-    for i, file_path in enumerate(mel_files):
-        file_name = os.path.splitext(os.path.basename(file_path))[0]
-        mel = torch.load(file_path)
-        mel = torch.autograd.Variable(mel.cuda())
-        mel = torch.unsqueeze(mel, 0)
+    mels = np.random.randint(100, 1300, size=num_runs)
+    for i in range(num_runs):
+        run_mel_length = mels[i] if dynamic_mel_length else 700
+        mel = torch.rand((1, 80, run_mel_length)).cuda()
         mel = mel.half() if is_fp16 else mel
         start = time.time()
         with torch.no_grad():
-            audio = waveglow.infer(mel, sigma=sigma)
+            audio = waveglow.infer(mel, sigma=0.6)
             if denoiser_strength > 0:
                 audio = denoiser(audio, denoiser_strength)
             audio = audio * MAX_WAV_VALUE
@@ -72,32 +69,25 @@ def main(mel_files, waveglow_path, sigma, output_dir, sampling_rate, is_fp16,
         print(f"Duration: {dur:.4f}s\tAudio duration: {audio_duiration:.2f}s\tRTF: {rtf:.2f}")
     print(f"[{len(dur_arr)}]Average duration: {np.mean(dur_arr[1:]):.4f}s")
     print(f"Average Audio duration: {np.mean(audio_arr):.4f}s")
-    print(f"Average Mel length: {mellen/10.0:.4f}s")
+    print(f"Average Mel length: {float(mellen/num_runs):.1f}s")
     print(f"Average RTF: {np.mean(rtf_arr[1:]):.4f}s")
-        # audio = audio.squeeze()
-        # audio = audio.cpu().numpy()
-        # audio = audio.astype('int16')
-        # audio_path = os.path.join(
-        #     output_dir, "{}_synthesis.wav".format(file_name))
-        # write(audio_path, sampling_rate, audio)
-        # print(audio_path)
+
 
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', "--filelist_path", required=True)
+    parser.add_argument('-n', '--num_runs', default=100, type=int, 
+                        help='Number of runs to get the benchmark.')
     parser.add_argument('-w', '--waveglow_path',
                         help='Path to waveglow decoder checkpoint with model')
-    parser.add_argument('-o', "--output_dir", required=True)
-    parser.add_argument("-s", "--sigma", default=1.0, type=float)
     parser.add_argument("--sampling_rate", default=22050, type=int)
     parser.add_argument("--is_fp16", action="store_true")
+    parser.add_argument("--is_dynamic_inputs", action="store_true")
     parser.add_argument("-d", "--denoiser_strength", default=0.0, type=float,
                         help='Removes model bias. Start with 0.1 and adjust')
 
     args = parser.parse_args()
 
-    main(args.filelist_path, args.waveglow_path, args.sigma, args.output_dir,
-         args.sampling_rate, args.is_fp16, args.denoiser_strength)
+    main(args.num_runs, args.waveglow_path, args.is_fp16, args.sampling_rate, args.denoiser_strength, args.is_dynamic_inputs)

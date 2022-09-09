@@ -1,0 +1,9 @@
+__MACOSX__/
+__pycache__/
+.vscode/
+checkpoints/
+mel_spectrograms/
+*.wav
+*.log
+*.txt
+*.pt

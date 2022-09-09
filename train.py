@@ -70,15 +70,20 @@ def train(num_gpus, rank, group_name, output_directory, epochs, learning_rate,
     #=====END:   ADDED FOR DISTRIBUTED======
 
     criterion = WaveGlowLoss(sigma)
-    model = WaveGlow(**waveglow_config).cuda()
-
+    # import pdb;pdb.set_trace()
+    model = WaveGlow(**waveglow_config)
+    print(model)
+    num_params = sum(p.numel() for p in model.parameters())
+    print(f"Parameters: {num_params/1.0e6:.2f}M")
+    # import pdb;pdb.set_trace()
+    
     #=====START: ADDED FOR DISTRIBUTED======
     if num_gpus > 1:
         model = apply_gradient_allreduce(model)
     #=====END:   ADDED FOR DISTRIBUTED======
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
+    model = model.to('cuda')
     if fp16_run:
         from apex import amp
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1')
@@ -112,6 +117,7 @@ def train(num_gpus, rank, group_name, output_directory, epochs, learning_rate,
         logger = SummaryWriter(os.path.join(output_directory, 'logs'))
 
     model.train()
+    # import pdb;pdb.set_trace()
     epoch_offset = max(0, int(iteration / len(train_loader)))
     # ================ MAIN TRAINNIG LOOP! ===================
     for epoch in range(epoch_offset, epochs):
